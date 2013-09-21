@@ -2,7 +2,7 @@
 
 This script will auto accept key requests from machines in the `allow_ip_cidrs` list.
 
-Thanks to (MatthewT1)[https://github.com/MatthewT1] for the help debugging.
+Thanks to [MatthewT1](https://github.com/MatthewT1) for the help debugging.
 
 ## Requirements
 
