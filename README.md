@@ -17,8 +17,8 @@ Once install, you can edit your inotify jobs with `incrontab -e`.  Here's my `in
 ## Usage
 
 Just set the following two variables:
-* `allowed_ip_cidrs`
-* `salt_master_config` 
+* [`allowed_ip_cidrs`](https://github.com/VertigoRay/salt-key-accepter/blob/master/salt-key-accepter.py#L15-L17)
+* [`salt_master_config`](https://github.com/VertigoRay/salt-key-accepter/blob/master/salt-key-accepter.py#L18)
 
 ### `allowed_ip_cidrs`
 
