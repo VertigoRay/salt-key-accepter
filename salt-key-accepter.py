@@ -1,4 +1,7 @@
 #!/usr/bin/env /usr/bin/python
+#####################################
+# This file is managed by salt
+#####################################
 # This script will auto accept key requests from machines in 10.120.33.0/24
 # 
 # Triggered by incron.  Use `incrontab -l` on the salt master to see the command.
@@ -15,13 +18,12 @@ import time
 allowed_ip_cidrs = (
     '10.120.33.0/24',
 )
-salt_master_config = '/etc/salt/master'
 
 # Setup Logging
 log = logging.getLogger(inspect.stack()[-1][1])
 log.setLevel(logging.INFO)
 
-log_location = '/var/log/CAS'
+log_location = '/var/log'
 try: 
     os.makedirs(log_location)
 except OSError as e:
@@ -79,7 +81,6 @@ if not os.path.isfile('%s/%s' % (key_path, key_name)):
 
 salt = '/usr/bin/salt' if os.path.isfile('/usr/bin/salt') else sh('which salt')['out'].strip()
 saltkey = '/usr/bin/salt-key' if os.path.isfile('/usr/bin/salt-key') else sh('which salt-key')['out'].strip()
-cat = '/bin/cat' if os.path.isfile('/bin/cat') else sh('which cat')['out'].strip()
 grep = '/bin/grep' if os.path.isfile('/bin/grep') else sh('which grep')['out'].strip()
 
 
@@ -87,15 +88,14 @@ log.info('Temporarily Accepting cert: %s' % key_name)
 sh('%(saltkey)s --accept=%(key)s --yes' % {'saltkey':saltkey, 'key':key_name})
 
 log.info('Waiting for accepted to show in list ...')
-while len(sh('%(saltkey)s --list=accepted | grep %(key)s' % {'saltkey':saltkey, 'key':key_name})['out'].strip()) == 0:
+while len(sh('%(saltkey)s --list=accepted | %(grep)s %(key)s' % {'saltkey':saltkey, 'key':key_name, 'grep':grep})['out'].strip()) == 0:
     log.info('still waiting ...')
     time.sleep(1)
 
 log.info('done waiting!')
 
 log.info('Sync grains ...')
-res = sh('%(salt)s \'%(key)s\' saltutil.sync_grains' % {'salt':salt, 'key':key_name})
-log.info(res['out'])
+log.info(sh('%(salt)s \'%(key)s\' saltutil.sync_grains' % {'salt':salt, 'key':key_name})['out'])
 
 log.info('Getting IPv4 info from grains ...')
 ips = sh('%(salt)s \'%(key)s\' grains.item ipv4' % {'salt':salt, 'key':key_name})['out']
@@ -119,24 +119,11 @@ for ip in ips.splitlines():
             log.info('%s. Moving on ...' % e)
             
 if not approved:
-    log.info('Detecting pki_dir')
-
-    minions_rejected = os.path.join(os.path.split(key_path)[0], 'minions_rejected')
-    # in the sh(), we assume that if pki_dir exists more than once, than it only exists twice and the second one is the uncommented and effective one.
-    minions_rejected = minions_rejected if os.path.isdir(minions_rejected) else sh('%(cat)S %(salt_master_config)s | %(grep)s pki_dir' % {'saltkey':saltkey, 'salt_master_config':salt_master_config, 'key':key_name}).splitlines()[-1].split(' ')[1]
-
-    minions = os.path.join(os.path.split(key_path)[0], 'minions')
-    minions = minions if os.path.isdir(minions) else sh('%(cat)S %(salt_master_config)s | %(grep)s pki_dir' % {'saltkey':saltkey, 'salt_master_config':salt_master_config, 'key':key_name}).splitlines()[-1].split(' ')[1]
-
-    # Can't reject the key once it has been accepted ... 
-    # instead we will move it the minions dir
-    log.info('Moving key to Rejected list: %s' % minions_rejected)
-    shutil.move(os.path.join(minions, key_name), minions_rejected)
+    log.info('Rejecting Key: %s' % key_name)
+    sh('%(salt)s -r \'%(key)s\' --include-all --yes' % {'salt':salt, 'key':key_name})
     log.info(sh('%(saltkey)s --list=rejected' % {'saltkey': saltkey})['out'])
 
 else:
     log.info('IP Address is in a valid subnet!  All Done!')
-    ##do state highstate on minions
     log.info('Do state highstate after accepting the key')
-    sh('%(salt)s \'%(key)s\' state.highstate' % {'salt':salt, 'key':key_name})
-    log.info(res['out'])
+    log.info(sh('%(salt)s \'%(key)s\' state.highstate' % {'salt':salt, 'key':key_name})['out'])
